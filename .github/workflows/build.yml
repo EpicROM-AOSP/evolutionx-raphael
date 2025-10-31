@@ -53,4 +53,3 @@ jobs:
       with:
         name: EvolutionX-raphael
         path: ~/evox/out/target/product/raphael/*.zip
-EOF
