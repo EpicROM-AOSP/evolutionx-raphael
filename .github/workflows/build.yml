@@ -1,0 +1,58 @@
+mkdir -p .github/workflows
+cat > .github/workflows/build.yml <<'EOF'
+name: Build Evolution X 8 (Android 14 UDC) for raphael
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib \
+        gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev \
+        lib32z1-dev liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev libxml2 \
+        libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip \
+        zlib1g-dev openjdk-11-jdk repo
+
+        # Configure ccache
+        export USE_CCACHE=1
+        export CCACHE_EXEC=$(which ccache)
+        ccache -M 20G
+
+    - name: Initialize Evolution X manifest
+      run: |
+        mkdir ~/evox && cd ~/evox
+        repo init -u https://github.com/Evolution-X/manifest.git -b udc
+        repo sync -c --force-sync --no-clone-bundle --no-tags -j8
+
+    - name: Clone device, vendor, kernel and extras
+      run: |
+        cd ~/evox
+        git clone -b udc https://github.com/Evolution-X-Devices/device_xiaomi_raphael.git device/xiaomi/raphael
+        git clone -b udc https://github.com/Evolution-X-Devices/vendor_xiaomi_raphael.git vendor/xiaomi/raphael
+        git clone -b 14.0-matrix https://github.com/SOVIET-ANDROID/kernel_xiaomi_raphael.git kernel/xiaomi/raphael
+        git clone -b udc https://gitlab.com/EvoX/vendor_xiaomi_miuicamera.git vendor/xiaomi/miuicamera
+        git clone -b udc https://github.com/Evolution-X-Devices/packages_apps_ViPER4AndroidFX.git packages/apps/ViPER4AndroidFX
+        git clone -b udc https://github.com/Evolution-X-Devices/hardware_xiaomi.git hardware/xiaomi
+
+    - name: Build Evolution X
+      run: |
+        cd ~/evox
+        source build/envsetup.sh
+        lunch lineage_raphael-user
+        m evolution -j$(nproc)
+
+    - name: Upload ROM output
+      uses: actions/upload-artifact@v4
+      with:
+        name: EvolutionX-raphael
+        path: ~/evox/out/target/product/raphael/*.zip
+EOF
